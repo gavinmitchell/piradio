@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import RPi.GPIO as GPIO  
 import os
-from time import sleep
+import time
 
 # Define GPIO to LCD mapping
 LCD_RS = 23
@@ -47,25 +47,29 @@ GPIO.setup(BUTTON_2, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(BUTTON_3, GPIO.IN, pull_up_down=GPIO.PUD_DOWN) 
 
 def main():
+  lcd_init()
+
   try:  
     while True:            # this will carry on until you hit CTRL+C  
         if GPIO.input(STOP): 
             print "STOP BUTTON is PRESSED"  
             os.system("mpc stop")
-            sleep(5) 
+            lcd_string("STOP BUTTON PRESSED", LCD_LINE_1);
+            lcd_string("Stopping Music", LCD_LINE_2);
+            time.sleep(5) 
         if GPIO.input(BUTTON_1):
             print "BUTTON 1 IS PRESSED"  
             os.system("mpc clear; mpc load vick; mpc random on;mpc play")
-            sleep(5)       
+            time.sleep(5)       
         if GPIO.input(BUTTON_2):
             print "BUTTON 2 IS PRESSED"  
             os.system("mpc clear; mpc load main; mpc play 3")
-            sleep(5)      
+            time.sleep(5)      
         if GPIO.input(BUTTON_3): 
             print "BUTTON 3 IS PRESSED"  
             os.system("mpc clear; mpc load main; mpc play 4")
-            sleep(5)       
-        sleep(0.1)         
+            time.sleep(5)       
+        time.sleep(0.1)         
   finally:                   
     GPIO.cleanup()        
 
@@ -79,6 +83,66 @@ def lcd_init():
   lcd_byte(0x28,LCD_CMD) # 101000 Data length, number of lines, font size
   lcd_byte(0x01,LCD_CMD) # 000001 Clear display
   time.sleep(E_DELAY)
+
+def lcd_byte(bits, mode):
+  # Send byte to data pins
+  # bits = data
+  # mode = True  for character
+  #        False for command
+
+  GPIO.output(LCD_RS, mode) # RS
+
+  # High bits
+  GPIO.output(LCD_D4, False)
+  GPIO.output(LCD_D5, False)
+  GPIO.output(LCD_D6, False)
+  GPIO.output(LCD_D7, False)
+  if bits&0x10==0x10:
+    GPIO.output(LCD_D4, True)
+  if bits&0x20==0x20:
+    GPIO.output(LCD_D5, True)
+  if bits&0x40==0x40:
+    GPIO.output(LCD_D6, True)
+  if bits&0x80==0x80:
+    GPIO.output(LCD_D7, True)
+
+  # Toggle 'Enable' pin
+  lcd_toggle_enable()
+
+  # Low bits
+  GPIO.output(LCD_D4, False)
+  GPIO.output(LCD_D5, False)
+  GPIO.output(LCD_D6, False)
+  GPIO.output(LCD_D7, False)
+  if bits&0x01==0x01:
+    GPIO.output(LCD_D4, True)
+  if bits&0x02==0x02:
+    GPIO.output(LCD_D5, True)
+  if bits&0x04==0x04:
+    GPIO.output(LCD_D6, True)
+  if bits&0x08==0x08:
+    GPIO.output(LCD_D7, True)
+
+  # Toggle 'Enable' pin
+  lcd_toggle_enable()
+
+def lcd_toggle_enable():
+  # Toggle enable
+  time.sleep(E_DELAY)
+  GPIO.output(LCD_E, True)
+  time.sleep(E_PULSE)
+  GPIO.output(LCD_E, False)
+  time.sleep(E_DELAY)
+
+def lcd_string(message,line):
+  # Send string to display
+
+  message = message.ljust(LCD_WIDTH," ")
+
+  lcd_byte(line, LCD_CMD)
+
+  for i in range(LCD_WIDTH):
+    lcd_byte(ord(message[i]),LCD_CHR)
 
 try:
   main()
